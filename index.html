@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cipher — Secure Client-Side Text Encryption</title>
+  <meta name="description" content="Production-quality, zero-knowledge, client-side text encryption using XChaCha20-Poly1305 and Argon2id.">
+  
+  <!-- Relative stylesheet link for GitHub Pages compatibility -->
+  <link rel="stylesheet" href="./css/style.css">
+
+  <!-- Pinned libsodium wrapper for browser execution -->
+  <script src="https://cdn.jsdelivr.net/npm/libsodium-wrappers@0.7.15/dist/browsers/sodium.js"></script>
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header" id="main-header">
+      <div class="brand-section">
+        <div class="brand-logo" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect width="18" height="11" x="3" y="11" rx="2" ry="2"/>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+          </svg>
+        </div>
+        <div>
+          <h1 class="brand-title">Cipher</h1>
+          <p class="brand-subtitle">Authenticated Client-Side Cryptography (XChaCha20-Poly1305 + Argon2id)</p>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <button id="theme-toggle" class="btn btn-ghost btn-sm" aria-label="Toggle theme" title="Toggle dark/light mode">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Mode Selector Navigation -->
+    <nav class="mode-tabs-container" role="tablist" aria-label="Encryption Modes">
+      <button id="btn-mode-encrypt" class="mode-tab active" role="tab" aria-selected="true" aria-controls="panel-encrypt">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect width="18" height="11" x="3" y="11" rx="2" ry="2"/>
+          <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+        </svg>
+        <span>Encrypt Mode</span>
+      </button>
+      <button id="btn-mode-decrypt" class="mode-tab" role="tab" aria-selected="false" aria-controls="panel-decrypt">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect width="18" height="11" x="3" y="11" rx="2" ry="2"/>
+          <path d="M7 11V7a5 5 0 0 1 9.9-1"/>
+        </svg>
+        <span>Decrypt Mode</span>
+      </button>
+    </nav>
+
+    <!-- Main Content Area -->
+    <main id="main-content">
+      
+      <!-- ================= ENCRYPT PANEL ================= -->
+      <section id="panel-encrypt" class="card" role="tabpanel" aria-labelledby="btn-mode-encrypt">
+        <!-- Plaintext Input Group -->
+        <div class="form-group">
+          <div class="label-row">
+            <label for="encrypt-plaintext" class="form-label">
+              <span>Plaintext Message</span>
+            </label>
+            <span id="plaintext-stats" class="stats-badge" aria-live="polite">0 chars · 0 B · 0 words</span>
+          </div>
+          <div class="input-wrapper">
+            <textarea id="encrypt-plaintext" class="form-textarea" placeholder="Type or paste the confidential text you want to encrypt..." rows="5" spellcheck="false"></textarea>
+          </div>
+          <div class="field-action-bar">
+            <div class="action-buttons-group">
+              <button id="btn-paste-plaintext" type="button" class="btn btn-secondary btn-sm" title="Paste from clipboard">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect width="8" height="4" x="8" y="2" rx="1" ry="1"/>
+                  <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
+                </svg>
+                <span>Paste</span>
+              </button>
+              <button id="btn-upload-plaintext-file" type="button" class="btn btn-secondary btn-sm" title="Load plaintext from text file">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="17 8 12 3 7 8"/>
+                  <line x1="12" x2="12" y1="3" y2="15"/>
+                </svg>
+                <span>Upload File</span>
+              </button>
+              <input type="file" id="input-upload-plaintext" accept=".txt,.json,.md,.csv,text/*" class="hidden">
+            </div>
+            <button id="btn-clear-plaintext" type="button" class="btn btn-ghost btn-sm" title="Clear text">Clear</button>
+          </div>
+        </div>
+
+        <!-- Password Inputs Group -->
+        <div class="form-group">
+          <div class="password-grid">
+            <div>
+              <div class="label-row">
+                <label for="encrypt-password" class="form-label">Password / Passphrase</label>
+              </div>
+              <div class="password-input-wrapper">
+                <input type="password" id="encrypt-password" class="form-input" placeholder="Enter encryption password" autocomplete="new-password">
+                <button type="button" id="encrypt-toggle-password" class="toggle-password-btn" aria-label="Show password">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/>
+                    <circle cx="12" cy="12" r="3"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <div class="label-row">
+                <label for="encrypt-confirm-password" class="form-label">Confirm Password</label>
+              </div>
+              <div class="password-input-wrapper">
+                <input type="password" id="encrypt-confirm-password" class="form-input" placeholder="Re-enter password" autocomplete="new-password">
+                <button type="button" id="encrypt-toggle-confirm-password" class="toggle-password-btn" aria-label="Show confirm password">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/>
+                    <circle cx="12" cy="12" r="3"/>
+                  </svg>
+                </button>
+              </div>
+              <div id="password-match-warning" class="text-danger hidden" role="alert"></div>
+            </div>
+          </div>
+
+          <!-- Password Strength Meter -->
+          <div class="strength-meter-container" aria-live="polite">
+            <div class="strength-track">
+              <div id="password-strength-bar" class="strength-fill strength-error"></div>
+            </div>
+            <div class="strength-meta">
+              <span id="password-strength-feedback">Enter a strong passphrase to protect your data.</span>
+              <span id="password-strength-label" class="strength-badge badge-error">Empty</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Warning Callout -->
+        <div class="warning-box" role="note">
+          <svg class="warning-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/>
+            <line x1="12" y1="9" x2="12" y2="13"/>
+            <line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+          <div>
+            <strong>Important Privacy Notice:</strong> Your password is never stored or recoverable. If you lose it, the encrypted data cannot be decrypted.
+          </div>
+        </div>
+
+        <!-- Encrypt Action Button -->
+        <button id="btn-encrypt" type="button" class="btn btn-primary btn-block">
+          <span class="btn-spinner spinner hidden" aria-hidden="true"></span>
+          <span class="btn-label">Encrypt Text</span>
+        </button>
+
+        <!-- Status Message -->
+        <div id="encrypt-status" class="status-banner hidden" role="status" aria-live="polite"></div>
+
+        <!-- Encrypt Output Container -->
+        <div id="encrypt-output-container" class="output-card hidden">
+          <div class="label-row">
+            <label for="encrypt-output" class="form-label">
+              <span>Encrypted Output (Base64url Envelope)</span>
+            </label>
+            <span id="ciphertext-stats" class="stats-badge" aria-live="polite">0 chars · 0 B</span>
+          </div>
+          <div class="input-wrapper">
+            <textarea id="encrypt-output" class="form-textarea font-mono" readonly rows="5" placeholder="Encrypted payload will appear here..."></textarea>
+          </div>
+          <div class="field-action-bar">
+            <div class="action-buttons-group">
+              <button id="btn-copy-ciphertext" type="button" class="btn btn-primary btn-sm">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
+                  <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
+                </svg>
+                <span>Copy Ciphertext</span>
+              </button>
+              <button id="btn-download-ciphertext" type="button" class="btn btn-secondary btn-sm">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="7 10 12 15 17 10"/>
+                  <line x1="12" x2="12" y1="15" y2="3"/>
+                </svg>
+                <span>Download .cipher</span>
+              </button>
+            </div>
+            <button id="btn-clear-encrypt-output" type="button" class="btn btn-ghost btn-sm">Clear Output</button>
+          </div>
+        </div>
+      </section>
+
+
+      <!-- ================= DECRYPT PANEL ================= -->
+      <section id="panel-decrypt" class="card hidden" role="tabpanel" aria-labelledby="btn-mode-decrypt">
+        <!-- Ciphertext Input Group -->
+        <div class="form-group">
+          <div class="label-row">
+            <label for="decrypt-ciphertext" class="form-label">
+              <span>Encrypted Ciphertext</span>
+            </label>
+            <span id="decrypt-ciphertext-stats" class="stats-badge" aria-live="polite">0 chars · 0 B</span>
+          </div>
+          <div class="input-wrapper">
+            <textarea id="decrypt-ciphertext" class="form-textarea font-mono" placeholder="Paste the Base64url encrypted ciphertext envelope here..." rows="5" spellcheck="false"></textarea>
+          </div>
+          <div class="field-action-bar">
+            <div class="action-buttons-group">
+              <button id="btn-paste-ciphertext" type="button" class="btn btn-secondary btn-sm" title="Paste ciphertext from clipboard">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect width="8" height="4" x="8" y="2" rx="1" ry="1"/>
+                  <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
+                </svg>
+                <span>Paste Ciphertext</span>
+              </button>
+              <button id="btn-upload-ciphertext-file" type="button" class="btn btn-secondary btn-sm" title="Load ciphertext from file">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="17 8 12 3 7 8"/>
+                  <line x1="12" x2="12" y1="3" y2="15"/>
+                </svg>
+                <span>Upload .cipher</span>
+              </button>
+              <input type="file" id="input-upload-ciphertext" accept=".cipher,.txt,text/*" class="hidden">
+            </div>
+            <button id="btn-clear-ciphertext" type="button" class="btn btn-ghost btn-sm" title="Clear ciphertext">Clear</button>
+          </div>
+        </div>
+
+        <!-- Password Input -->
+        <div class="form-group">
+          <div class="label-row">
+            <label for="decrypt-password" class="form-label">Decryption Password</label>
+          </div>
+          <div class="password-input-wrapper">
+            <input type="password" id="decrypt-password" class="form-input" placeholder="Enter the password used during encryption" autocomplete="current-password">
+            <button type="button" id="decrypt-toggle-password" class="toggle-password-btn" aria-label="Show password">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/>
+                <circle cx="12" cy="12" r="3"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Decrypt Action Button -->
+        <button id="btn-decrypt" type="button" class="btn btn-primary btn-block">
+          <span class="btn-spinner spinner hidden" aria-hidden="true"></span>
+          <span class="btn-label">Decrypt &amp; Verify</span>
+        </button>
+
+        <!-- Status Message -->
+        <div id="decrypt-status" class="status-banner hidden" role="status" aria-live="polite"></div>
+
+        <!-- Decrypt Output Container -->
+        <div id="decrypt-output-container" class="output-card hidden">
+          <div class="label-row">
+            <label for="decrypt-output" class="form-label">
+              <span>Decrypted Plaintext Message</span>
+            </label>
+            <span id="decrypt-output-stats" class="stats-badge" aria-live="polite">0 chars · 0 B · 0 words</span>
+          </div>
+          <div class="input-wrapper">
+            <textarea id="decrypt-output" class="form-textarea" readonly rows="5" placeholder="Restored plaintext will appear here..."></textarea>
+          </div>
+          <div class="field-action-bar">
+            <div class="action-buttons-group">
+              <button id="btn-copy-plaintext" type="button" class="btn btn-primary btn-sm">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
+                  <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
+                </svg>
+                <span>Copy Plaintext</span>
+              </button>
+              <button id="btn-download-plaintext" type="button" class="btn btn-secondary btn-sm">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="7 10 12 15 17 10"/>
+                  <line x1="12" x2="12" y1="15" y2="3"/>
+                </svg>
+                <span>Download .txt</span>
+              </button>
+            </div>
+            <button id="btn-clear-decrypt-output" type="button" class="btn btn-ghost btn-sm">Clear Output</button>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+      <div>Zero-Knowledge Client-Side Cryptography · No Server Storage · No Telemetry</div>
+      <div class="footer-links">
+        <button id="btn-open-security" type="button" class="footer-link">Security Architecture &amp; Specifications</button>
+        <span>·</span>
+        <button id="btn-open-selftest" type="button" class="footer-link">Run Cryptographic Self-Test Suite</button>
+      </div>
+    </footer>
+  </div>
+
+  <!-- ================= SECURITY SPECIFICATIONS MODAL ================= -->
+  <div id="modal-security" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="security-modal-title" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3 id="security-modal-title" class="modal-title">Security Model &amp; Architecture</h3>
+        <button id="btn-close-security" type="button" class="btn btn-ghost btn-sm" aria-label="Close modal">✕</button>
+      </div>
+      <div class="modal-body">
+        <h4>1. Authenticated Encryption (AEAD)</h4>
+        <p>This tool utilizes <strong>XChaCha20-Poly1305</strong> (IETF AEAD) with an extended 192-bit random nonce. It provides both confidentiality and cryptographic integrity verification. Any alteration or tampering of the ciphertext is detected immediately by the Poly1305 MAC tag prior to releasing plaintext.</p>
+
+        <h4>2. Memory-Hard Key Derivation (Argon2id)</h4>
+        <p>Passwords are transformed into a 256-bit encryption key using <strong>Argon2id v1.3</strong>, the winner of the Password Hashing Competition. Argon2id provides state-of-the-art resistance against GPU/ASIC brute-force attacks and side-channel timing attacks by requiring substantial memory allocations (64 MiB) during derivation.</p>
+
+        <h4>3. Random Salt &amp; Nonce Freshness</h4>
+        <p>A fresh 128-bit cryptographic salt is generated for every encryption operation, preventing precomputed dictionary or rainbow-table attacks. A fresh 192-bit nonce eliminates the risk of nonce-reuse collisions even across millions of operations.</p>
+
+        <h4>4. Zero Server Storage &amp; Privacy Guarantees</h4>
+        <ul>
+          <li><strong>Local Execution:</strong> All encryption and decryption routines occur in your browser's local WebAssembly/JavaScript environment.</li>
+          <li><strong>No Transmission:</strong> Plaintext, passwords, keys, salts, and nonces are never sent over any network, backend API, analytics platform, or telemetry service.</li>
+          <li><strong>Ephemeral Memory:</strong> Derived keys are zeroized in memory immediately after cryptographic operations. No sensitive data is saved to localStorage, sessionStorage, cookies, or IndexedDB.</li>
+          <li><strong>Zero Recovery:</strong> No backdoor or password recovery exists. Losing your password means the data is permanently unrecoverable.</li>
+        </ul>
+
+        <div class="security-quote">
+          "With a strong password and a correct implementation, recovering the plaintext by breaking the cryptographic primitives is designed to be computationally infeasible with currently known practical attacks."
+        </div>
+
+        <h4>5. Binary Envelope Specification</h4>
+        <p>Output ciphertexts are packaged in a compact, portable binary structure encoded in RFC 4648 Base64url:</p>
+        <ul>
+          <li><strong>Byte 0:</strong> Protocol Version (<code>0x01</code>)</li>
+          <li><strong>Byte 1:</strong> Cipher Suite ID (<code>0x01</code> = Argon2id + XChaCha20-Poly1305)</li>
+          <li><strong>Bytes 2–5:</strong> Argon2id OpsLimit (uint32 big-endian)</li>
+          <li><strong>Bytes 6–9:</strong> Argon2id MemLimit in KiB (uint32 big-endian)</li>
+          <li><strong>Bytes 10–25:</strong> 16-byte Cryptographic Salt</li>
+          <li><strong>Bytes 26–49:</strong> 24-byte Extended Nonce</li>
+          <li><strong>Bytes 50+:</strong> Ciphertext body with appended 16-byte Poly1305 MAC tag</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= SELF-TEST SUITE MODAL ================= -->
+  <div id="modal-selftest" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="selftest-modal-title" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3 id="selftest-modal-title" class="modal-title">Cryptographic Self-Test Suite</h3>
+        <button id="btn-close-selftest" type="button" class="btn btn-ghost btn-sm" aria-label="Close modal">✕</button>
+      </div>
+      <div class="modal-body">
+        <p>Live in-browser test suite validating mathematical correctness, bit-level tamper resistance, and key derivation integrity:</p>
+        
+        <div id="selftest-results-list" class="selftest-list">
+          <!-- Dynamic results populated by JavaScript -->
+        </div>
+
+        <div class="field-action-bar">
+          <span id="selftest-summary-badge" class="badge badge-success">Running...</span>
+          <button id="btn-run-selftest" type="button" class="btn btn-secondary btn-sm">Re-run Verification</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Alert Notifications Container -->
+  <div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+  <!-- Main Application Logic (Relative Path) -->
+  <script type="module" src="./js/app.js"></script>
+</body>
+</html>

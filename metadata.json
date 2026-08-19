@@ -1,0 +1,6 @@
+{
+  "name": "Cipher - Client-Side Text Encryption",
+  "description": "Secure, zero-knowledge, client-side text encryption and decryption tool using XChaCha20-Poly1305 and Argon2id, designed for static GitHub Pages deployment.",
+  "requestFramePermissions": ["clipboard-read", "clipboard-write"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
