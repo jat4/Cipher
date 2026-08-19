@@ -32,32 +32,35 @@ function hasRequiredSodium(s) {
   );
 }
 
-function waitForSodiumReady(s) {
-  return Promise.resolve(s.ready).then(() => {
-    if (!hasRequiredSodium(s)) {
-      throw new Error('Required libsodium cryptographic functions are unavailable');
-    }
-    return s;
-  });
+async function waitForSodiumReady(s) {
+  if (!s || !s.ready) {
+    throw new Error('libsodium failed to initialize');
+  }
+  await s.ready;
+  if (!hasRequiredSodium(s)) {
+    throw new Error('Required libsodium cryptographic functions are unavailable');
+  }
+  return s;
 }
 
 function loadSodiumScript() {
   return new Promise((resolve, reject) => {
     const existingScript = document.querySelector('script[data-cipher-sodium="sumo"]');
 
-    const finish = () => {
-      const s = window.sodium;
-      if (!s) {
-        reject(new Error('libsodium loaded but did not expose the browser API'));
-        return;
-      }
-      waitForSodiumReady(s).then(resolve).catch(reject);
-    };
+    // The index page normally loads SUMO before app.js. In that case the
+    // script's load event has already fired, so wait directly on sodium.ready
+    // instead of registering a listener that would never run.
+    if (existingScript && window.sodium) {
+      waitForSodiumReady(window.sodium).then(resolve).catch(reject);
+      return;
+    }
 
     if (existingScript) {
+      const finish = () => {
+        waitForSodiumReady(window.sodium).then(resolve).catch(reject);
+      };
       existingScript.addEventListener('load', finish, { once: true });
       existingScript.addEventListener('error', () => reject(new Error('Unable to load the cryptographic engine')), { once: true });
-      if (hasRequiredSodium(window.sodium)) finish();
       return;
     }
 
@@ -65,7 +68,9 @@ function loadSodiumScript() {
     script.src = SODIUM_CDN;
     script.async = false;
     script.dataset.cipherSodium = 'sumo';
-    script.onload = finish;
+    script.onload = () => {
+      waitForSodiumReady(window.sodium).then(resolve).catch(reject);
+    };
     script.onerror = () => reject(new Error('Unable to load the cryptographic engine'));
     document.head.appendChild(script);
   });
@@ -75,15 +80,13 @@ export function getSodium() {
   if (sodiumPromise) return sodiumPromise;
 
   sodiumPromise = (async () => {
-    // Prefer an already-loaded SUMO instance. This avoids loading two
-    // different libsodium builds and prevents global-window race conditions.
-    if (hasRequiredSodium(window.sodium)) {
-      return waitForSodiumReady(window.sodium);
-    }
-
-    // The application may already have loaded the regular libsodium wrapper.
-    // Do not delete or mutate that object; load the required SUMO build once.
     try {
+      // Prefer the already-loaded SUMO instance.
+      if (window.sodium) {
+        return await waitForSodiumReady(window.sodium);
+      }
+
+      // Fallback for deployments where the HTML script was not loaded.
       return await loadSodiumScript();
     } catch (error) {
       sodiumPromise = null;
