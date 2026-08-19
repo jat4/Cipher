@@ -24,46 +24,72 @@ const SODIUM_CDN = 'https://cdn.jsdelivr.net/npm/libsodium-wrappers-sumo@0.7.15/
 let sodiumPromise = null;
 
 function hasRequiredSodium(s) {
-  return !!(s && s.crypto_pwhash && s.crypto_aead_xchacha20poly1305_ietf_encrypt && s.crypto_aead_xchacha20poly1305_ietf_decrypt);
+  return !!(
+    s &&
+    s.crypto_pwhash &&
+    s.crypto_aead_xchacha20poly1305_ietf_encrypt &&
+    s.crypto_aead_xchacha20poly1305_ietf_decrypt
+  );
+}
+
+function waitForSodiumReady(s) {
+  return Promise.resolve(s.ready).then(() => {
+    if (!hasRequiredSodium(s)) {
+      throw new Error('Required libsodium cryptographic functions are unavailable');
+    }
+    return s;
+  });
+}
+
+function loadSodiumScript() {
+  return new Promise((resolve, reject) => {
+    const existingScript = document.querySelector('script[data-cipher-sodium="sumo"]');
+
+    const finish = () => {
+      const s = window.sodium;
+      if (!s) {
+        reject(new Error('libsodium loaded but did not expose the browser API'));
+        return;
+      }
+      waitForSodiumReady(s).then(resolve).catch(reject);
+    };
+
+    if (existingScript) {
+      existingScript.addEventListener('load', finish, { once: true });
+      existingScript.addEventListener('error', () => reject(new Error('Unable to load the cryptographic engine')), { once: true });
+      if (hasRequiredSodium(window.sodium)) finish();
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = SODIUM_CDN;
+    script.async = false;
+    script.dataset.cipherSodium = 'sumo';
+    script.onload = finish;
+    script.onerror = () => reject(new Error('Unable to load the cryptographic engine'));
+    document.head.appendChild(script);
+  });
 }
 
 export function getSodium() {
   if (sodiumPromise) return sodiumPromise;
 
-  sodiumPromise = new Promise((resolve, reject) => {
-    const finish = async () => {
-      try {
-        const s = window.sodium;
-        if (!s || !s.ready) throw new Error('libsodium failed to initialize');
-        await s.ready;
-        if (!hasRequiredSodium(s)) throw new Error('Required libsodium functions are unavailable');
-        resolve(s);
-      } catch (e) {
-        sodiumPromise = null;
-        reject(e);
-      }
-    };
-
+  sodiumPromise = (async () => {
+    // Prefer an already-loaded SUMO instance. This avoids loading two
+    // different libsodium builds and prevents global-window race conditions.
     if (hasRequiredSodium(window.sodium)) {
-      Promise.resolve(window.sodium.ready).then(finish).catch(() => {
-        sodiumPromise = null;
-        reject(new Error('libsodium initialization failed'));
-      });
-      return;
+      return waitForSodiumReady(window.sodium);
     }
 
-    try { delete window.sodium; } catch (_) { window.sodium = undefined; }
-
-    const script = document.createElement('script');
-    script.src = SODIUM_CDN;
-    script.async = true;
-    script.onload = finish;
-    script.onerror = () => {
+    // The application may already have loaded the regular libsodium wrapper.
+    // Do not delete or mutate that object; load the required SUMO build once.
+    try {
+      return await loadSodiumScript();
+    } catch (error) {
       sodiumPromise = null;
-      reject(new Error('Unable to load the cryptographic engine'));
-    };
-    document.head.appendChild(script);
-  });
+      throw error;
+    }
+  })();
 
   return sodiumPromise;
 }
