@@ -9,8 +9,8 @@
   <!-- Relative stylesheet link for GitHub Pages compatibility -->
   <link rel="stylesheet" href="./css/style.css">
 
-  <!-- Pinned libsodium wrapper for browser execution -->
-  <script src="https://cdn.jsdelivr.net/npm/libsodium-wrappers@0.7.15/dist/browsers/sodium.js"></script>
+  <!-- Pinned SUMO libsodium wrapper: required for Argon2id browser support -->
+  <script data-cipher-sodium="sumo" src="https://cdn.jsdelivr.net/npm/libsodium-wrappers-sumo@0.7.15/dist/browsers-sumo/sodium.js"></script>
 </head>
 <body>
   <div class="app-container">
@@ -119,7 +119,7 @@
               </div>
               <div class="password-input-wrapper">
                 <input type="password" id="encrypt-confirm-password" class="form-input" placeholder="Re-enter password" autocomplete="new-password">
-                <button type="button" id="encrypt-toggle-confirm-password" class="toggle-password-btn" aria-label="Show confirm password">
+                <button type="button" id="encrypt-toggle-confirm-password" class="toggle-password-btn" aria-label="Show password">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/>
                     <circle cx="12" cy="12" r="3"/>
@@ -178,8 +178,8 @@
             <div class="action-buttons-group">
               <button id="btn-copy-ciphertext" type="button" class="btn btn-primary btn-sm">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
-                  <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
+                  <rect width="14" height="14" x="8" y="8" rx="2"/>
+                  <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 0 2 2"/>
                 </svg>
                 <span>Copy Ciphertext</span>
               </button>
@@ -196,7 +196,6 @@
           </div>
         </div>
       </section>
-
 
       <!-- ================= DECRYPT PANEL ================= -->
       <section id="panel-decrypt" class="card hidden" role="tabpanel" aria-labelledby="btn-mode-decrypt">
@@ -224,7 +223,6 @@
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                   <polyline points="17 8 12 3 7 8"/>
-                  <line x1="12" x2="12" y1="3" y2="15"/>
                 </svg>
                 <span>Upload .cipher</span>
               </button>
@@ -274,8 +272,8 @@
             <div class="action-buttons-group">
               <button id="btn-copy-plaintext" type="button" class="btn btn-primary btn-sm">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
-                  <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
+                  <rect width="14" height="14" x="8" y="8" rx="2"/>
+                  <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 0 2 2"/>
                 </svg>
                 <span>Copy Plaintext</span>
               </button>
@@ -316,13 +314,10 @@
       <div class="modal-body">
         <h4>1. Authenticated Encryption (AEAD)</h4>
         <p>This tool utilizes <strong>XChaCha20-Poly1305</strong> (IETF AEAD) with an extended 192-bit random nonce. It provides both confidentiality and cryptographic integrity verification. Any alteration or tampering of the ciphertext is detected immediately by the Poly1305 MAC tag prior to releasing plaintext.</p>
-
         <h4>2. Memory-Hard Key Derivation (Argon2id)</h4>
         <p>Passwords are transformed into a 256-bit encryption key using <strong>Argon2id v1.3</strong>, the winner of the Password Hashing Competition. Argon2id provides state-of-the-art resistance against GPU/ASIC brute-force attacks and side-channel timing attacks by requiring substantial memory allocations (64 MiB) during derivation.</p>
-
         <h4>3. Random Salt &amp; Nonce Freshness</h4>
         <p>A fresh 128-bit cryptographic salt is generated for every encryption operation, preventing precomputed dictionary or rainbow-table attacks. A fresh 192-bit nonce eliminates the risk of nonce-reuse collisions even across millions of operations.</p>
-
         <h4>4. Zero Server Storage &amp; Privacy Guarantees</h4>
         <ul>
           <li><strong>Local Execution:</strong> All encryption and decryption routines occur in your browser's local WebAssembly/JavaScript environment.</li>
@@ -330,11 +325,7 @@
           <li><strong>Ephemeral Memory:</strong> Derived keys are zeroized in memory immediately after cryptographic operations. No sensitive data is saved to localStorage, sessionStorage, cookies, or IndexedDB.</li>
           <li><strong>Zero Recovery:</strong> No backdoor or password recovery exists. Losing your password means the data is permanently unrecoverable.</li>
         </ul>
-
-        <div class="security-quote">
-          "With a strong password and a correct implementation, recovering the plaintext by breaking the cryptographic primitives is designed to be computationally infeasible with currently known practical attacks."
-        </div>
-
+        <div class="security-quote">"With a strong password and a correct implementation, recovering the plaintext by breaking the cryptographic primitives is designed to be computationally infeasible with currently known practical attacks."</div>
         <h4>5. Binary Envelope Specification</h4>
         <p>Output ciphertexts are packaged in a compact, portable binary structure encoded in RFC 4648 Base64url:</p>
         <ul>
@@ -359,11 +350,7 @@
       </div>
       <div class="modal-body">
         <p>Live in-browser test suite validating mathematical correctness, bit-level tamper resistance, and key derivation integrity:</p>
-        
-        <div id="selftest-results-list" class="selftest-list">
-          <!-- Dynamic results populated by JavaScript -->
-        </div>
-
+        <div id="selftest-results-list" class="selftest-list"></div>
         <div class="field-action-bar">
           <span id="selftest-summary-badge" class="badge badge-success">Running...</span>
           <button id="btn-run-selftest" type="button" class="btn btn-secondary btn-sm">Re-run Verification</button>
@@ -372,10 +359,7 @@
     </div>
   </div>
 
-  <!-- Toast Alert Notifications Container -->
   <div id="toast-container" class="toast-container" aria-live="polite"></div>
-
-  <!-- Main Application Logic (Relative Path) -->
   <script type="module" src="./js/app.js"></script>
 </body>
 </html>
